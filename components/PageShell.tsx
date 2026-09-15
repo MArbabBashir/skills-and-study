@@ -8,7 +8,7 @@ export function PageShell({ children }: { children: ReactNode }) {
     <>
       <ScrollProgress />
       <Navbar />
-      <main className="min-h-screen">{children}</main>
+      <main className="min-h-screen w-full min-w-0 overflow-hidden">{children}</main>
       <Footer />
     </>
   );
