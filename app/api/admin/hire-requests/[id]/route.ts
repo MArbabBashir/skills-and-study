@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import path from "path";
-import { mkdir, writeFile } from "fs/promises";
+import { put } from "@vercel/blob";
 import sql from "@/lib/db";
 
 type RouteContext = {
@@ -27,7 +26,10 @@ export async function PATCH(
 
     if (!Number.isInteger(requestId) || requestId <= 0) {
       return NextResponse.json(
-        { success: false, message: "Invalid request ID." },
+        {
+          success: false,
+          message: "Invalid request ID.",
+        },
         { status: 400 }
       );
     }
@@ -40,7 +42,10 @@ export async function PATCH(
 
     if (!token) {
       return NextResponse.json(
-        { success: false, message: "Unauthorized." },
+        {
+          success: false,
+          message: "Unauthorized.",
+        },
         { status: 401 }
       );
     }
@@ -72,106 +77,40 @@ export async function PATCH(
     const existingRequest = existing[0];
 
     // ----------------------------------------------
-    // FORM DATA
+    // READ FORM DATA
     // ----------------------------------------------
 
     const formData = await request.formData();
 
-    const name = String(formData.get("name") ?? "");
+    const name = String(formData.get("name") ?? "").trim();
+
     const linkedin_profile = String(
       formData.get("linkedin_profile") ?? ""
-    );
-    const email = String(formData.get("email") ?? "");
-    const domain = String(formData.get("domain") ?? "");
-    const comment = String(formData.get("comment") ?? "");
+    ).trim();
+
+    const email = String(
+      formData.get("email") ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const domain = String(
+      formData.get("domain") ?? ""
+    ).trim();
+
+    const comment = String(
+      formData.get("comment") ?? ""
+    ).trim();
+
     const status = String(
       formData.get("status") ?? "pending"
     );
+
     const admin_note = String(
       formData.get("admin_note") ?? ""
-    );
+    ).trim();
 
     const image = formData.get("image");
-
-    // ----------------------------------------------
-    // IMAGE PATH
-    // ----------------------------------------------
-
-    let profileImagePath =
-      existingRequest.profile_image;
-
-    // ----------------------------------------------
-    // NEW IMAGE UPLOAD
-    // ----------------------------------------------
-
-    if (image instanceof File && image.size > 0) {
-      const originalFileName = image.name.toLowerCase();
-
-      if (
-        image.type !== "image/webp" &&
-        !originalFileName.endsWith(".webp")
-      ) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Only WEBP images are allowed.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const maxSize = 5 * 1024 * 1024;
-
-      if (image.size > maxSize) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Image must be smaller than 5 MB.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const safeName = makeSafeFileName(
-        name || String(existingRequest.name)
-      );
-
-      if (!safeName) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Invalid student name.",
-          },
-          { status: 400 }
-        );
-      }
-
-      const fileName = `${safeName}.webp`;
-
-      const uploadDirectory = path.join(
-        process.cwd(),
-        "public",
-        "hire-student"
-      );
-
-      await mkdir(uploadDirectory, {
-        recursive: true,
-      });
-
-      const filePath = path.join(
-        uploadDirectory,
-        fileName
-      );
-
-      const imageBuffer = Buffer.from(
-        await image.arrayBuffer()
-      );
-
-      await writeFile(filePath, imageBuffer);
-
-      profileImagePath =
-        `/hire-student/${fileName}`;
-    }
 
     // ----------------------------------------------
     // VALIDATION
@@ -208,21 +147,83 @@ export async function PATCH(
     }
 
     // ----------------------------------------------
+    // KEEP OLD IMAGE BY DEFAULT
+    // ----------------------------------------------
+
+    let profileImagePath =
+      existingRequest.profile_image;
+
+    // ----------------------------------------------
+    // UPLOAD NEW IMAGE TO VERCEL BLOB
+    // ----------------------------------------------
+
+    if (image instanceof File && image.size > 0) {
+      const originalFileName = image.name.toLowerCase();
+
+      if (
+        image.type !== "image/webp" &&
+        !originalFileName.endsWith(".webp")
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Only WEBP images are allowed.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const maxSize = 5 * 1024 * 1024;
+
+      if (image.size > maxSize) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Image must be smaller than 5 MB.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const safeName = makeSafeFileName(name);
+
+      if (!safeName) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Invalid student name.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const fileName = `hire-student/${safeName}-${Date.now()}.webp`;
+
+      const blob = await put(fileName, image, {
+        access: "public",
+        contentType: "image/webp",
+        addRandomSuffix: false,
+      });
+
+      profileImagePath = blob.url;
+    }
+
+    // ----------------------------------------------
     // UPDATE DATABASE
     // ----------------------------------------------
 
     const result = await sql`
       UPDATE "hire-me-requests"
       SET
-        name = ${name.trim()},
-        linkedin_profile = ${linkedin_profile.trim()},
-        email = ${email.trim().toLowerCase()},
-        domain = ${domain.trim()},
-        comment = ${comment.trim()},
+        name = ${name},
+        linkedin_profile = ${linkedin_profile},
+        email = ${email},
+        domain = ${domain},
+        comment = ${comment},
         profile_image = ${profileImagePath},
         status = ${status},
         admin_note = ${
-          admin_note.trim() || null
+          admin_note || null
         },
         reviewed_at = ${
           status === "approved" ||
