@@ -164,7 +164,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                           type="text"
                           value={form.name}
                           onChange={(v) => setForm({ ...form, name: v })}
-                          placeholder="John Doe"
+                          placeholder="Muhammad Ali"
                           required
                         />
                         <FormField
@@ -172,7 +172,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                           type="email"
                           value={form.email}
                           onChange={(v) => setForm({ ...form, email: v })}
-                          placeholder="john@example.com"
+                          placeholder="MuhammadAli@example.com"
                           required
                         />
                       </div>
