@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import db  from '@/lib/db';
-import { createAdminToken } from '@/lib/auth';
+import { NextRequest, NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
+import sql from "@/lib/db";
+import { createAdminToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,26 +9,25 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: "Email and password are required" },
         { status: 400 }
       );
     }
 
-    const [rows] = await db.query(
-      'SELECT id, email, password_hash, role FROM users WHERE email = ? LIMIT 1',
-      [email]
-    );
-
-    const users = rows as {
-      id: number;
-      email: string;
-      password_hash: string;
-      role: string;
-    }[];
+    const users = await sql`
+      SELECT
+        id,
+        email,
+        password_hash,
+        role
+      FROM users
+      WHERE email = ${email.trim().toLowerCase()}
+      LIMIT 1
+    `;
 
     if (users.length === 0) {
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: "Invalid email or password" },
         { status: 401 }
       );
     }
@@ -42,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     if (!passwordMatch) {
       return NextResponse.json(
-        { error: 'Invalid email or password' },
+        { error: "Invalid email or password" },
         { status: 401 }
       );
     }
@@ -57,27 +56,26 @@ export async function POST(request: NextRequest) {
     // Create response
     const response = NextResponse.json({
       success: true,
-      message: 'Login successful',
+      message: "Login successful",
     });
 
     // Save JWT in HTTP-only cookie
     response.cookies.set({
-      name: 'admin_token',
+      name: "admin_token",
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 60 * 1, // 8 hours
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 1,
     });
 
     return response;
-
   } catch (error) {
-    console.error('Admin login error:', error);
+    console.error("Admin login error:", error);
 
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

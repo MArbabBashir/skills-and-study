@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import sql from "@/lib/db";
 
 export async function POST(request: Request) {
     try {
@@ -20,18 +20,23 @@ export async function POST(request: Request) {
             );
         }
 
-        const result = await pool.query(
-            `INSERT INTO contact_messages
+        const result = await sql`
+            INSERT INTO contact_messages
             (name, email, subject, inquiry_type, message)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING *`,
-            [name, email, subject, inquiryType, message]
-        );
+            VALUES (
+                ${name},
+                ${email},
+                ${subject},
+                ${inquiryType},
+                ${message}
+            )
+            RETURNING *
+        `;
 
         return NextResponse.json(
             {
                 success: true,
-                data: result.rows[0],
+                data: result[0],
             },
             { status: 201 }
         );

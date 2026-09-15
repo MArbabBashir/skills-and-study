@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { mkdir, writeFile } from 'fs/promises';
-import pool from '@/lib/db';
+import { NextRequest, NextResponse } from "next/server";
+import path from "path";
+import { mkdir, writeFile } from "fs/promises";
+import sql from "@/lib/db";
 
 type RouteContext = {
   params: Promise<{
@@ -13,8 +13,8 @@ function makeSafeFileName(name: string) {
   return name
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export async function POST(
@@ -34,7 +34,7 @@ export async function POST(
       return NextResponse.json(
         {
           success: false,
-          message: 'Invalid request ID.',
+          message: "Invalid request ID.",
         },
         { status: 400 }
       );
@@ -44,57 +44,37 @@ export async function POST(
     // ADMIN JWT COOKIE
     // --------------------------------------------------
 
-    const token = request.cookies.get('admin_token')?.value;
+    const token = request.cookies.get("admin_token")?.value;
 
     if (!token) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Unauthorized.',
+          message: "Unauthorized.",
         },
         { status: 401 }
       );
     }
 
-    /*
-      Your existing admin authentication is already working
-      for GET /api/admin/hire-requests.
-
-      Therefore this route checks that the admin_token cookie
-      exists as well.
-
-      If your project has a separate JWT verification helper,
-      we can add the exact same verification here later.
-    */
-
     // --------------------------------------------------
     // GET HIRE REQUEST
     // --------------------------------------------------
 
-    const [rows] = await pool.execute(
-      `
-        SELECT
-          id,
-          name,
-          status
-        FROM \`hire-me-requests\`
-        WHERE id = ?
-        LIMIT 1
-      `,
-      [requestId]
-    );
-
-    const requests = rows as Array<{
-      id: number;
-      name: string;
-      status: 'pending' | 'approved' | 'disapproved';
-    }>;
+    const requests = await sql`
+      SELECT
+        id,
+        name,
+        status
+      FROM "hire-me-requests"
+      WHERE id = ${requestId}
+      LIMIT 1
+    `;
 
     if (requests.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Hire request not found.',
+          message: "Hire request not found.",
         },
         { status: 404 }
       );
@@ -108,13 +88,13 @@ export async function POST(
 
     const formData = await request.formData();
 
-    const image = formData.get('image');
+    const image = formData.get("image");
 
     if (!(image instanceof File)) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Please select a profile image.',
+          message: "Please select a profile image.",
         },
         { status: 400 }
       );
@@ -127,13 +107,13 @@ export async function POST(
     const originalFileName = image.name.toLowerCase();
 
     if (
-      image.type !== 'image/webp' &&
-      !originalFileName.endsWith('.webp')
+      image.type !== "image/webp" &&
+      !originalFileName.endsWith(".webp")
     ) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Only WEBP images are allowed.',
+          message: "Only WEBP images are allowed.",
         },
         { status: 400 }
       );
@@ -143,13 +123,13 @@ export async function POST(
     // FILE SIZE
     // --------------------------------------------------
 
-    const maxSize = 5 * 1024 * 1024; // 5 MB
+    const maxSize = 5 * 1024 * 1024;
 
     if (image.size > maxSize) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Image must be smaller than 5 MB.',
+          message: "Image must be smaller than 5 MB.",
         },
         { status: 400 }
       );
@@ -159,13 +139,13 @@ export async function POST(
     // CREATE SAFE FILE NAME
     // --------------------------------------------------
 
-    const safeName = makeSafeFileName(hireRequest.name);
+    const safeName = makeSafeFileName(String(hireRequest.name));
 
     if (!safeName) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Invalid student name.',
+          message: "Invalid student name.",
         },
         { status: 400 }
       );
@@ -179,8 +159,8 @@ export async function POST(
 
     const uploadDirectory = path.join(
       process.cwd(),
-      'public',
-      'hire-student'
+      "public",
+      "hire-student"
     );
 
     await mkdir(uploadDirectory, {
@@ -212,20 +192,15 @@ export async function POST(
     // APPROVE REQUEST
     // --------------------------------------------------
 
-    await pool.execute(
-      `
-        UPDATE \`hire-me-requests\`
-        SET
-          profile_image = ?,
-          status = 'approved',
-          reviewed_at = NOW()
-        WHERE id = ?
-      `,
-      [
-        profileImagePath,
-        requestId,
-      ]
-    );
+    await sql`
+      UPDATE "hire-me-requests"
+      SET
+        profile_image = ${profileImagePath},
+        status = 'approved',
+        reviewed_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${requestId}
+    `;
 
     // --------------------------------------------------
     // RESPONSE
@@ -234,7 +209,7 @@ export async function POST(
     return NextResponse.json(
       {
         success: true,
-        message: 'Profile approved successfully.',
+        message: "Profile approved successfully.",
         profile_image: profileImagePath,
         reviewed_at: new Date().toISOString(),
       },
@@ -242,14 +217,14 @@ export async function POST(
     );
   } catch (error) {
     console.error(
-      'POST /api/admin/hire-requests/[id]/approve error:',
+      "POST /api/admin/hire-requests/[id]/approve error:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
-        message: 'Unable to approve request.',
+        message: "Unable to approve request.",
       },
       { status: 500 }
     );

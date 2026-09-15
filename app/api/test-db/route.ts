@@ -1,13 +1,15 @@
-import db from "@/lib/db";
+import sql from "@/lib/db";
 
 export async function GET() {
   try {
-    const [rows] = await db.query("SELECT 1 AS connected");
+    const result = await sql`
+      SELECT 1 AS connected
+    `;
 
     return Response.json({
       success: true,
-      message: "MySQL connected successfully!",
-      result: rows,
+      message: "PostgreSQL connected successfully!",
+      result,
     });
   } catch (error) {
     console.error(error);
@@ -15,7 +17,7 @@ export async function GET() {
     return Response.json(
       {
         success: false,
-        message: "MySQL connection failed",
+        message: "PostgreSQL connection failed",
       },
       { status: 500 }
     );

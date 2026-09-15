@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { NextRequest, NextResponse } from "next/server";
+import sql from "@/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'All fields are required.',
+          message: "All fields are required.",
         },
         { status: 400 }
       );
@@ -34,13 +34,11 @@ export async function POST(request: NextRequest) {
     try {
       const linkedinUrl = new URL(linkedin_profile.trim());
 
-      if (
-        !linkedinUrl.hostname.includes('linkedin.com')
-      ) {
+      if (!linkedinUrl.hostname.includes("linkedin.com")) {
         return NextResponse.json(
           {
             success: false,
-            message: 'Please enter a valid LinkedIn profile URL.',
+            message: "Please enter a valid LinkedIn profile URL.",
           },
           { status: 400 }
         );
@@ -49,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Please enter a valid LinkedIn profile URL.',
+          message: "Please enter a valid LinkedIn profile URL.",
         },
         { status: 400 }
       );
@@ -62,52 +60,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: 'Please enter a valid email address.',
+          message: "Please enter a valid email address.",
         },
         { status: 400 }
       );
     }
 
-    // Insert request into MySQL
-    const [result] = await pool.execute(
-      `
-        INSERT INTO \`hire-me-requests\`
-        (
-          name,
-          linkedin_profile,
-          email,
-          domain,
-          comment,
-          profile_image,
-          status
-        )
-        VALUES (?, ?, ?, ?, ?, NULL, 'pending')
-      `,
-      [
-        name.trim(),
-        linkedin_profile.trim(),
-        email.trim().toLowerCase(),
-        domain.trim(),
-        comment.trim(),
-      ]
-    );
+    // Insert request into PostgreSQL
+    await sql`
+      INSERT INTO "hire-me-requests"
+      (
+        name,
+        linkedin_profile,
+        email,
+        domain,
+        comment,
+        profile_image,
+        status
+      )
+      VALUES (
+        ${name.trim()},
+        ${linkedin_profile.trim()},
+        ${email.trim().toLowerCase()},
+        ${domain.trim()},
+        ${comment.trim()},
+        NULL,
+        'pending'
+      )
+    `;
 
     return NextResponse.json(
       {
         success: true,
         message:
-          'Your profile request has been submitted successfully.',
+          "Your profile request has been submitted successfully.",
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error('POST /api/hire-requests error:', error);
+    console.error("POST /api/hire-requests error:", error);
 
     return NextResponse.json(
       {
         success: false,
         message:
-          'Something went wrong while submitting your request.',
+          "Something went wrong while submitting your request.",
       },
       { status: 500 }
     );
@@ -116,7 +113,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const [rows] = await pool.execute(`
+    const students = await sql`
       SELECT
         id,
         name,
@@ -125,26 +122,26 @@ export async function GET() {
         domain,
         comment,
         profile_image
-      FROM \`hire-me-requests\`
+      FROM "hire-me-requests"
       WHERE status = 'approved'
         AND profile_image IS NOT NULL
       ORDER BY created_at DESC
-    `);
+    `;
 
     return NextResponse.json({
       success: true,
-      students: rows,
+      students,
     });
   } catch (error) {
     console.error(
-      'GET /api/hire-requests error:',
+      "GET /api/hire-requests error:",
       error
     );
 
     return NextResponse.json(
       {
         success: false,
-        message: 'Unable to load approved students.',
+        message: "Unable to load approved students.",
       },
       { status: 500 }
     );
